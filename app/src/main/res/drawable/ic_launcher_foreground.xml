@@ -1,0 +1,25 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 外圈：像分数环 -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M54,22a32,32 0 1,0 0,64a32,32 0 1,0 0,-64z"
+        android:strokeAlpha="0.9"
+        android:strokeColor="#FFFBF2"
+        android:strokeWidth="3.5" />
+    <!-- 内圆：一天的底色 -->
+    <path
+        android:fillColor="#FFFBF2"
+        android:pathData="M54,32a22,22 0 1,0 0,44a22,22 0 1,0 0,-44z" />
+    <!-- 对勾：今天做成了 -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M44,55l7,8l15,-17"
+        android:strokeColor="#1F6F5C"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="6.5" />
+</vector>
