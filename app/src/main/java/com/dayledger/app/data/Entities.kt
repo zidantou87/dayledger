@@ -102,7 +102,20 @@ data class MealEntity(
     val kcal: Int? = null,
     val proteinG: Int? = null,
     val vegG: Int? = null,
+    /** 健康标签位掩码：蔬菜/水果/蛋白/主食/油炸/甜食/含糖饮料/酒 */
+    val tags: Int = 0,
 )
+
+object MealTag {
+    const val VEG = 1
+    const val FRUIT = 2
+    const val PROTEIN = 4
+    const val STAPLE = 8
+    const val FRIED = 16
+    const val SWEET = 32
+    const val SUGARY = 64
+    const val ALCOHOL = 128
+}
 
 @Serializable
 @Entity(tableName = "day_reviews")

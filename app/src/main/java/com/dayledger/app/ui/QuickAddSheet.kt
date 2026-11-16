@@ -25,6 +25,7 @@ import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.Timer
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -38,7 +39,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -62,6 +65,7 @@ import com.dayledger.app.data.MEAL_BREAKFAST
 import com.dayledger.app.data.MEAL_DINNER
 import com.dayledger.app.data.MEAL_LUNCH
 import com.dayledger.app.data.MEAL_SNACK
+import com.dayledger.app.data.MealTag
 import com.dayledger.app.data.PLACE_DINEOUT
 import com.dayledger.app.data.PLACE_HOME
 import com.dayledger.app.data.PLACE_TAKEOUT
@@ -89,6 +93,7 @@ data class EditData(
     val veg: Int? = null,
     val title: String = "",
     val top3: Boolean = false,
+    val tags: Int = 0,
 )
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -103,11 +108,11 @@ fun QuickAddSheet(
     onAddExpense: (Long, Long, String, Long) -> Unit,
     onStartTimer: (Long, String, Int) -> Unit,
     onAddBlock: (Long, Long, Long) -> Unit,
-    onAddMeal: (Int, Int, Int?, Int?, Int?, String, Long) -> Unit,
+    onAddMeal: (Int, Int, Int?, String, Int, Long) -> Unit,
     onAddEvent: (String, Long, Long, Boolean) -> Unit,
     onUpdateExpense: (Long, Long, Long, String) -> Unit = { _, _, _, _ -> },
     onUpdateBlock: (Long, Long, Long, Long) -> Unit = { _, _, _, _ -> },
-    onUpdateMeal: (Long, Int, Int, Int?, Int?, Int?, String) -> Unit = { _, _, _, _, _, _, _ -> },
+    onUpdateMeal: (Long, Int, Int, Int?, String, Int) -> Unit = { _, _, _, _, _, _ -> },
     onUpdateEvent: (Long, String, Long, Long, Boolean) -> Unit = { _, _, _, _, _ -> },
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -184,14 +189,16 @@ fun QuickAddSheet(
                     initialType = edit?.type,
                     initialPlace = edit?.place,
                     initialKcal = edit?.kcal,
-                    initialProtein = edit?.protein,
-                    initialVeg = edit?.veg,
                     initialNote = edit?.note ?: "",
+                    initialTags = edit?.tags ?: 0,
                     saveLabel = if (edit != null) "保存修改" else "记下这餐",
                     onBack = { mode = AddMode.Menu },
-                    onSave = { type, place, kcal, protein, veg, note ->
-                        if (edit != null) onUpdateMeal(edit.id, type, place, kcal, protein, veg, note)
-                        else onAddMeal(type, place, kcal, protein, veg, note, base)
+                    onSave = { type, place, kcal, note, tags ->
+                        if (edit != null) {
+                            onUpdateMeal(edit.id, type, place, kcal, note, tags)
+                        } else {
+                            onAddMeal(type, place, kcal, note, tags, base)
+                        }
                         onDismiss()
                     },
                 )
@@ -438,12 +445,11 @@ private fun MealEditor(
     initialType: Int? = null,
     initialPlace: Int? = null,
     initialKcal: Int? = null,
-    initialProtein: Int? = null,
-    initialVeg: Int? = null,
     initialNote: String = "",
+    initialTags: Int = 0,
     saveLabel: String = "记下这餐",
     onBack: () -> Unit,
-    onSave: (Int, Int, Int?, Int?, Int?, String) -> Unit,
+    onSave: (Int, Int, Int?, String, Int) -> Unit,
 ) {
     var type by remember {
         mutableIntStateOf(
@@ -457,12 +463,15 @@ private fun MealEditor(
     }
     var place by remember { mutableIntStateOf(initialPlace ?: PLACE_HOME) }
     var kcal by remember { mutableStateOf(initialKcal?.toString() ?: "") }
-    var protein by remember { mutableStateOf(initialProtein?.toString() ?: "") }
-    var veg by remember { mutableStateOf(initialVeg?.toString() ?: "") }
     var note by remember { mutableStateOf(initialNote) }
+    var tags by remember { mutableIntStateOf(initialTags) }
+
+    fun toggle(bit: Int) {
+        tags = if (tags and bit != 0) tags and bit.inv() else tags or bit
+    }
 
     Column {
-        EditorHeader("记饮食", onBack)
+        EditorHeader(if (saveLabel == "保存修改") "修改饮食" else "记饮食", onBack)
         Spacer(Modifier.height(10.dp))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(MEAL_BREAKFAST to "早餐", MEAL_LUNCH to "午餐", MEAL_DINNER to "晚餐", MEAL_SNACK to "加餐").forEach { (t, label) ->
@@ -475,28 +484,45 @@ private fun MealEditor(
                 ChoiceChip(label, p == place, Ink.money) { place = p }
             }
         }
-        Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            NumberField("热量 kcal", kcal, Modifier.weight(1f)) { kcal = it }
-            NumberField("蛋白 g", protein, Modifier.weight(1f)) { protein = it }
-            NumberField("蔬菜 g", veg, Modifier.weight(1f)) { veg = it }
-        }
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(14.dp))
+        Text("吃了什么", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(6.dp))
         OutlinedTextField(
             value = note,
             onValueChange = { note = it },
-            label = { Text("吃了什么（可不填）") },
-            singleLine = true,
+            placeholder = { Text("比如：米饭、青菜、鸡腿") },
+            minLines = 2,
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(14.dp))
+        Text("这餐有什么（可多选，用于判断健康度）", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(6.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(
+                MealTag.VEG to "蔬菜",
+                MealTag.FRUIT to "水果",
+                MealTag.PROTEIN to "蛋白",
+                MealTag.STAPLE to "主食",
+                MealTag.FRIED to "油炸",
+                MealTag.SWEET to "甜食",
+                MealTag.SUGARY to "含糖饮料",
+                MealTag.ALCOHOL to "酒",
+            ).forEach { (bit, label) ->
+                val on = tags and bit != 0
+                val color = if (bit == MealTag.FRIED || bit == MealTag.SWEET || bit == MealTag.SUGARY || bit == MealTag.ALCOHOL) Ink.bad else Ink.good
+                ChoiceChip(label, on, color) { toggle(bit) }
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        NumberField("热量 kcal（可不填）", kcal, Modifier.fillMaxWidth()) { kcal = it }
+        Spacer(Modifier.height(14.dp))
         Button(
-            onClick = { onSave(type, place, kcal.toIntOrNull(), protein.toIntOrNull(), veg.toIntOrNull(), note) },
+            onClick = { onSave(type, place, kcal.toIntOrNull(), note, tags) },
             modifier = Modifier.fillMaxWidth().height(52.dp),
         ) { Text(saveLabel) }
         Spacer(Modifier.height(6.dp))
         Text(
-            "热量和营养可以留空，先把吃了什么记下来。",
+            "重点写清吃了什么；热量和标签能填就填，留空不会扣分。",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -570,7 +596,7 @@ private fun EventEditor(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun TimeEditContent(
     activities: List<ActivityCategoryEntity>,
@@ -583,6 +609,8 @@ private fun TimeEditContent(
     var activityId by remember { mutableStateOf(initialActivityId.takeIf { it != 0L } ?: activities.firstOrNull()?.id ?: 0L) }
     var start by remember { mutableLongStateOf(initialStart) }
     var end by remember { mutableLongStateOf(initialEnd.coerceAtLeast(initialStart + 15 * 60_000L)) }
+    var pickStart by remember { mutableStateOf(false) }
+    var pickEnd by remember { mutableStateOf(false) }
     val minutes = ((end - start) / 60_000L).toInt().coerceAtLeast(0)
 
     Column {
@@ -599,27 +627,108 @@ private fun TimeEditContent(
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("开始", Modifier.weight(1f))
             OutlinedButton(onClick = { start -= 15 * 60_000L; if (end <= start) end = start + 15 * 60_000L }) { Text("−15") }
-            Text(Fmt.hm(start), Modifier.width(72.dp), textAlign = TextAlign.Center, style = MaterialTheme.typography.titleMedium)
+            Text(
+                Fmt.hm(start),
+                Modifier
+                    .width(80.dp)
+                    .clickable { pickStart = true },
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
             OutlinedButton(onClick = { start += 15 * 60_000L; if (end <= start) end = start + 15 * 60_000L }) { Text("+15") }
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("结束", Modifier.weight(1f))
-            OutlinedButton(onClick = { end -= 15 * 60_000L }) { Text("−15") }
-            Text(Fmt.hm(end), Modifier.width(72.dp), textAlign = TextAlign.Center, style = MaterialTheme.typography.titleMedium)
+            OutlinedButton(onClick = { end = maxOf(end - 15 * 60_000L, start + 15 * 60_000L) }) { Text("−15") }
+            Text(
+                Fmt.hm(end),
+                Modifier
+                    .width(80.dp)
+                    .clickable { pickEnd = true },
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
             OutlinedButton(onClick = { end += 15 * 60_000L }) { Text("+15") }
         }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            "时长 ${Fmt.duration(minutes)}",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "时长 ${Fmt.duration(minutes)} · 点时间可精确到分钟",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = { end = System.currentTimeMillis() }) { Text("结束设为现在", fontSize = 12.sp) }
+        }
         Spacer(Modifier.height(14.dp))
         Button(
             onClick = { onSave(activityId, start, end) },
             enabled = activityId != 0L && end > start,
             modifier = Modifier.fillMaxWidth().height(52.dp),
         ) { Text("保存修改") }
+    }
+
+    if (pickStart) {
+        TimePickDialog(
+            initialHour = hourOf(start),
+            initialMinute = minuteOf(start),
+            onDismiss = { pickStart = false },
+            onConfirm = { h, m ->
+                start = withMinuteOfDay(start, h, m)
+                end = maxOf(end, start + 15 * 60_000L)
+                pickStart = false
+            },
+        )
+    }
+    if (pickEnd) {
+        TimePickDialog(
+            initialHour = hourOf(end),
+            initialMinute = minuteOf(end),
+            onDismiss = { pickEnd = false },
+            onConfirm = { h, m ->
+                val candidate = withMinuteOfDay(end, h, m)
+                end = maxOf(candidate, start + 15 * 60_000L)
+                pickEnd = false
+            },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimePickDialog(
+    initialHour: Int,
+    initialMinute: Int,
+    onDismiss: () -> Unit,
+    onConfirm: (Int, Int) -> Unit,
+) {
+    val state = rememberTimePickerState(initialHour = initialHour, initialMinute = initialMinute, is24Hour = true)
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+        ) {
+            Column(
+                Modifier.padding(vertical = 18.dp, horizontal = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text("选择时间", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(10.dp))
+                TimePicker(state = state)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onDismiss) { Text("取消") }
+                    TextButton(onClick = { onConfirm(state.hour, state.minute) }) { Text("确定") }
+                }
+            }
+        }
     }
 }
 
@@ -678,6 +787,18 @@ private fun parseCents(text: String): Long {
 
 private fun hourOf(millis: Long): Int =
     Calendar.getInstance().apply { timeInMillis = millis }.get(Calendar.HOUR_OF_DAY)
+
+private fun minuteOf(millis: Long): Int =
+    Calendar.getInstance().apply { timeInMillis = millis }.get(Calendar.MINUTE)
+
+private fun withMinuteOfDay(epoch: Long, hour: Int, minute: Int): Long =
+    Calendar.getInstance().apply {
+        timeInMillis = epoch
+        set(Calendar.HOUR_OF_DAY, hour)
+        set(Calendar.MINUTE, minute)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }.timeInMillis
 
 private fun roundUpToHalfHour(millis: Long): Long {
     val step = 30 * 60_000L

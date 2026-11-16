@@ -170,9 +170,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun addMeal(type: Int, place: Int, kcal: Int?, protein: Int?, veg: Int?, note: String, at: Long) {
+    fun addMeal(type: Int, place: Int, kcal: Int?, note: String, tags: Int, at: Long) {
         viewModelScope.launch {
-            repo.addMeal(type, place, kcal, protein, veg, note, at)
+            repo.addMeal(type, place, kcal, note, tags, at)
             bump()
         }
     }
@@ -288,9 +288,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun updateMeal(id: Long, type: Int, place: Int, kcal: Int?, protein: Int?, veg: Int?, note: String) {
+    fun updateMeal(id: Long, type: Int, place: Int, kcal: Int?, note: String, tags: Int) {
         viewModelScope.launch {
-            repo.updateMeal(id, type, place, kcal, protein, veg, note)
+            repo.updateMeal(id, type, place, kcal, note, tags)
             bump()
         }
     }

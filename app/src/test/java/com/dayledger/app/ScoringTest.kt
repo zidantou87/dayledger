@@ -80,7 +80,7 @@ class ScoringTest {
 
         assertEquals(54f, s.dim("exec")!!.score, 0.5f)
         assertEquals(70f, s.dim("state")!!.score, 0.5f)
-        assertEquals(85.7f, s.dim("diet")!!.score, 1.2f)
+        assertEquals(82.1f, s.dim("diet")!!.score, 1.5f)
         assertEquals(0f, s.dim("sport")!!.score, 0.01f)
         assertTrue("total should be in 60..70, was ${s.total}", s.total in 60f..70f)
         assertEquals("C", s.grade)

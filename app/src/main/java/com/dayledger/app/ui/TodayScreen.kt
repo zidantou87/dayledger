@@ -31,6 +31,7 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.Timer
+import androidx.compose.material.icons.rounded.WaterDrop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -107,6 +108,7 @@ fun TodayScreen(
     onSkipEvent: (Long) -> Unit,
     onDeleteEvent: (Long) -> Unit,
     onEditRow: (TimelineRow) -> Unit,
+    onAddWater: (Int) -> Unit,
 ) {
     val rows = remember(day) { buildRows(day) }
     var selected by remember { mutableStateOf<TimelineRow?>(null) }
@@ -125,7 +127,7 @@ fun TodayScreen(
         if (day.running != null) {
             item { RunningCard(day, onStopTimer, onOpen = { focusOpen = true }) }
         }
-        item { SummaryCard(day) }
+        item { SummaryCard(day, onAddWater) }
         item { QuickActions(onAddExpense, onAddTime, onAddMeal, onAddEvent) }
         item {
             Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -238,6 +240,7 @@ private fun DayHeader(day: DayUi, onPrevDay: () -> Unit, onNextDay: () -> Unit, 
             ScoreRing(
                 score = if (day.settings.showScore && day.scoreReady) day.score.total else null,
                 grade = if (day.scoreReady) day.score.grade else "—",
+                emptyLabel = if (day.hasData) "记录不够" else "未记录",
             )
             Spacer(Modifier.height(2.dp))
             Row {
@@ -253,7 +256,7 @@ private fun DayHeader(day: DayUi, onPrevDay: () -> Unit, onNextDay: () -> Unit, 
 }
 
 @Composable
-private fun SummaryCard(day: DayUi) {
+private fun SummaryCard(day: DayUi, onAddWater: (Int) -> Unit) {
     val f = day.facts
     SectionCard {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -289,6 +292,19 @@ private fun SummaryCard(day: DayUi) {
                 Ink.diet,
                 Modifier.weight(1f),
             )
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Rounded.WaterDrop,
+                contentDescription = null,
+                tint = Ink.time,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text("今天喝了 ${f.waterMl} ml", style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = { onAddWater(250) }) { Text("+250 ml") }
         }
     }
 }

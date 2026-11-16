@@ -178,33 +178,42 @@ object Scorer {
         if (f.meals.isEmpty()) {
             return DimScore("diet", "饮食", cfg.weightDiet, 0f, false, listOf("今天没有记录饮食"))
         }
+
+        // 三餐 35
         val mealPts = (if (f.hasBreakfast) 12f else 0f) + (if (f.hasLunch) 12f else 0f) + (if (f.hasDinner) 11f else 0f)
         var points = mealPts
         var maxPoints = 35f
 
-        val kcal = f.kcal
-        if (kcal != null) {
-            val target = cfg.calorieTarget.coerceAtLeast(1)
-            val dev = abs(kcal - target).toFloat() / target
-            val pts = if (dev <= 0.1f) 25f else 25f * clamp01(1f - (dev - 0.1f) / 0.4f)
-            points += pts
-            maxPoints += 25f
-        }
+        // 标注「吃了什么」25：写了内容的餐占比
+        val noteRatio = f.mealsWithNote.toFloat() / f.meals.size
+        points += 25f * noteRatio
+        maxPoints += 25f
 
-        val protein = f.proteinG
-        if (protein != null) {
-            points += 20f * clamp01(protein.toFloat() / cfg.proteinTargetG.coerceAtLeast(1))
+        // 健康标签 20：有标签才算；蔬果/蛋白加分，油炸/甜/含糖饮料/酒扣分
+        if (f.hasAnyTags) {
+            val bonus = (if (f.hasVeg) 5f else 0f) + (if (f.hasProtein) 5f else 0f)
+            val penalty = f.junkTagCount * 3f
+            points += (10f + bonus - penalty).coerceIn(0f, 20f)
             maxPoints += 20f
         }
 
-        val veg = f.vegG
-        if (veg != null) {
-            points += 10f * clamp01(veg / 300f)
+        // 热量 10：填了才算，没填不计（不惩罚）
+        val kcal = f.kcal
+        var kcalDev: Float? = null
+        if (kcal != null) {
+            val target = cfg.calorieTarget.coerceAtLeast(1)
+            val dev = abs(kcal - target).toFloat() / target
+            kcalDev = dev
+            val pts = if (dev <= 0.1f) 1f else clamp01(1f - (dev - 0.1f) / 0.4f)
+            points += 10f * pts
             maxPoints += 10f
         }
 
-        points += 10f * clamp01(f.waterMl / 1500f)
-        maxPoints += 10f
+        // 饮水 10：喝了才算；0 视为没记，不罚
+        if (f.waterMl > 0) {
+            points += 10f * clamp01(f.waterMl / 1500f)
+            maxPoints += 10f
+        }
 
         var penalty = 0f
         if (f.lateSnack) penalty += 10f
@@ -222,9 +231,14 @@ object Scorer {
                     if (f.hasDinner) "晚" else null,
                 ).joinToString("·").ifEmpty { "未记" },
             )
-            add(if (kcal != null) "热量 $kcal kcal（目标 ${cfg.calorieTarget}）" else "热量未填")
-            add(if (protein != null) "蛋白 ${protein}g（目标 ${cfg.proteinTargetG}g）" else "蛋白未填")
-            add("蔬菜 ${veg ?: 0}g · 水 ${f.waterMl}ml")
+            add("标注 ${f.mealsWithNote}/${f.meals.size} 餐（写了吃了什么）")
+            add(
+                if (!f.hasAnyTags) "没有健康标签（健康度未计）"
+                else "标签：${if (f.hasVeg) "有蔬果 " else ""}${if (f.hasProtein) "有蛋白 " else ""}".trim() +
+                    if (f.junkTagCount > 0) " · 油炸/甜/饮料/酒 ${f.junkTagCount} 类" else "",
+            )
+            add(if (kcal != null) "热量 $kcal kcal（目标 ${cfg.calorieTarget}，偏差 ${Fmt.pct(kcalDev ?: 0f)}）" else "热量未填（不计）")
+            add("饮水 ${f.waterMl}ml" + if (f.waterMl == 0) "（未记，不计）" else "")
             if (penalty > 0f) add("扣分 −${penalty.toInt()}（" + listOfNotNull(
                 if (f.lateSnack) "夜宵" else null,
                 if (f.sugary) "含糖饮料" else null,

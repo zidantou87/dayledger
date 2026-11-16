@@ -153,6 +153,7 @@ fun AppRoot() {
                     onSkipEvent = vm::skipEvent,
                     onDeleteEvent = vm::deleteEvent,
                     onEditRow = { row -> editData = editDataFor(day, row) },
+                    onAddWater = vm::addWater,
                 )
             }
             composable("calendar") {
@@ -222,7 +223,7 @@ fun AppRoot() {
                 }
             },
             onAddBlock = { id, start, end -> vm.addBlock(id, start, end) },
-            onAddMeal = { type, place, kcal, protein, veg, note, at -> vm.addMeal(type, place, kcal, protein, veg, note, at) },
+            onAddMeal = { type, place, kcal, note, tags, at -> vm.addMeal(type, place, kcal, note, tags, at) },
             onAddEvent = { title, start, end, top3 ->
                 // 日程提醒要用通知，第一次加日程时顺手申请
                 askNotificationPermission()
@@ -230,9 +231,7 @@ fun AppRoot() {
             },
             onUpdateExpense = { id, cents, catId, note -> vm.updateTransaction(id, cents, catId, note) },
             onUpdateBlock = { id, activityId, start, end -> vm.updateBlock(id, activityId, start, end) },
-            onUpdateMeal = { id, type, place, kcal, protein, veg, note ->
-                vm.updateMeal(id, type, place, kcal, protein, veg, note)
-            },
+            onUpdateMeal = { id, type, place, kcal, note, tags -> vm.updateMeal(id, type, place, kcal, note, tags) },
             onUpdateEvent = { id, title, start, end, top3 -> vm.updateEvent(id, title, start, end, top3) },
         )
     }
@@ -288,6 +287,7 @@ private fun editDataFor(day: DayUi, row: TimelineRow): EditData? {
                 protein = it.proteinG,
                 veg = it.vegG,
                 note = it.note,
+                tags = it.tags,
             )
         }
 

@@ -14,6 +14,8 @@ import com.dayledger.app.util.Fmt
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.Serializable
@@ -63,6 +65,8 @@ private data class CoreDay(
 )
 
 class DayRepository(private val db: DayLedgerDb, val settingsRepo: SettingsRepository) {
+
+    private val seedMutex = Mutex()
 
     private val txDao = db.transactions()
     private val catDao = db.categories()
@@ -312,9 +316,8 @@ class DayRepository(private val db: DayLedgerDb, val settingsRepo: SettingsRepos
         type: Int,
         place: Int,
         kcal: Int?,
-        proteinG: Int?,
-        vegG: Int?,
         note: String,
+        tags: Int = 0,
         at: Long = System.currentTimeMillis(),
     ) {
         mealDao.insert(
@@ -325,8 +328,7 @@ class DayRepository(private val db: DayLedgerDb, val settingsRepo: SettingsRepos
                 place = place,
                 note = note,
                 kcal = kcal,
-                proteinG = proteinG,
-                vegG = vegG,
+                tags = tags,
             ),
         )
     }
@@ -338,9 +340,8 @@ class DayRepository(private val db: DayLedgerDb, val settingsRepo: SettingsRepos
         type: Int,
         place: Int,
         kcal: Int?,
-        proteinG: Int?,
-        vegG: Int?,
         note: String,
+        tags: Int,
         at: Long? = null,
     ) {
         val m = mealDao.byId(id) ?: return
@@ -349,9 +350,8 @@ class DayRepository(private val db: DayLedgerDb, val settingsRepo: SettingsRepos
                 type = type,
                 place = place,
                 kcal = kcal,
-                proteinG = proteinG,
-                vegG = vegG,
                 note = note,
+                tags = tags,
                 occurredAt = at ?: m.occurredAt,
                 localDate = Fmt.dateKeyOf(at ?: m.occurredAt),
             ),
@@ -405,8 +405,8 @@ class DayRepository(private val db: DayLedgerDb, val settingsRepo: SettingsRepos
         seedIfNeeded()
     }
 
-    suspend fun seedIfNeeded() {
-        if (catDao.count() > 0) return
+    suspend fun seedIfNeeded() = seedMutex.withLock {
+        if (catDao.count() > 0) return@withLock
         catDao.insertAll(defaultCategories())
         actDao.insertAll(defaultActivities())
     }
@@ -663,8 +663,16 @@ class DayRepository(private val db: DayLedgerDb, val settingsRepo: SettingsRepos
         ActivityCategoryEntity(name = "休息", color = 0xFF9C8F7A.toInt(), productive = false, sortOrder = 14),
     )
 
-    /** 老版本装过的用户没有运动细分，补一次（按名字幂等），同时把顺序理顺 */
-    suspend fun ensureSportActivities() {
+    /** 老版本装过的用户没有运动细分，补一次（按名字幂等），同时去重、理顺顺序 */
+    suspend fun ensureSportActivities() = seedMutex.withLock {
+        // 旧版本并发初始化可能插重复，这里按名字去重（保留 id 最小的）
+        actDao.all().groupBy { it.name }.values.forEach { group ->
+            group.sortedBy { it.id }.drop(1).forEach { actDao.delete(it.id) }
+        }
+        catDao.all().groupBy { it.name to it.kind }.values.forEach { group ->
+            group.sortedBy { it.id }.drop(1).forEach { catDao.delete(it.id) }
+        }
+
         val defaults = defaultActivities().associateBy { it.name }
         val existing = actDao.all()
         existing.forEach { row ->

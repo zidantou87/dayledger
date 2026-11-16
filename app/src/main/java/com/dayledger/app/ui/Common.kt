@@ -81,7 +81,7 @@ fun SectionCard(
 }
 
 @Composable
-fun ScoreRing(score: Float?, grade: String, size: Dp = 88.dp, stroke: Dp = 8.dp) {
+fun ScoreRing(score: Float?, grade: String, size: Dp = 88.dp, stroke: Dp = 8.dp, emptyLabel: String = "未记录") {
     val color = Ink.score(score)
     val track = MaterialTheme.colorScheme.surfaceVariant
     val sweep by animateFloatAsState(
@@ -116,7 +116,7 @@ fun ScoreRing(score: Float?, grade: String, size: Dp = 88.dp, stroke: Dp = 8.dp)
                 color = if (score == null) MaterialTheme.colorScheme.onSurfaceVariant else color,
             )
             Text(
-                text = if (score == null) "未记录" else "$grade 等",
+                text = if (score == null) emptyLabel else "$grade 等",
                 fontSize = 10.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

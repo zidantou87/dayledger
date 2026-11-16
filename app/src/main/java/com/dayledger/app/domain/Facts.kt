@@ -9,6 +9,7 @@ import com.dayledger.app.data.MEAL_BREAKFAST
 import com.dayledger.app.data.MEAL_DINNER
 import com.dayledger.app.data.MEAL_LUNCH
 import com.dayledger.app.data.MEAL_SNACK
+import com.dayledger.app.data.MealTag
 import com.dayledger.app.data.MealEntity
 import com.dayledger.app.data.ActivityCategoryEntity
 import com.dayledger.app.data.CategoryEntity
@@ -99,6 +100,7 @@ data class MealFact(
     val vegG: Int?,
     val place: Int,
     val note: String,
+    val tags: Int = 0,
 )
 
 data class DayFacts(
@@ -141,10 +143,16 @@ data class DayFacts(
     val proteinG: Int? = meals.mapNotNull { it.proteinG }.takeIf { it.isNotEmpty() }?.sum()
     val vegG: Int? = meals.mapNotNull { it.vegG }.takeIf { it.isNotEmpty() }?.sum()
     val takeoutCount: Int = meals.count { it.place == PLACE_TAKEOUT }
+    val mealsWithNote: Int = meals.count { it.note.isNotBlank() }
+    val hasAnyTags: Boolean = meals.any { it.tags != 0 }
+    val hasVeg: Boolean = meals.any { it.tags and MealTag.VEG != 0 || it.tags and MealTag.FRUIT != 0 }
+    val hasProtein: Boolean = meals.any { it.tags and MealTag.PROTEIN != 0 }
+    val junkTagCount: Int = listOf(MealTag.FRIED, MealTag.SWEET, MealTag.SUGARY, MealTag.ALCOHOL)
+        .count { tag -> meals.any { it.tags and tag != 0 } }
     val lateSnack: Boolean = meals.any { it.type == MEAL_SNACK && (it.minute >= 22 * 60 || it.minute < 4 * 60) }
     val sugary: Boolean = meals.any { m ->
-        val n = m.note
-        listOf("奶茶", "可乐", "饮料", "拿铁", "星冰乐", "蛋糕").any { n.contains(it) }
+        m.tags and MealTag.SUGARY != 0 ||
+            listOf("奶茶", "可乐", "饮料", "拿铁", "星冰乐", "蛋糕").any { m.note.contains(it) }
     }
     val eventsDone: Int = events.count { it.done }
     val eventsSkipped: Int = events.count { it.skipped }
@@ -237,6 +245,7 @@ fun buildDayFacts(
             vegG = m.vegG,
             place = m.place,
             note = m.note,
+            tags = m.tags,
         )
     }
 

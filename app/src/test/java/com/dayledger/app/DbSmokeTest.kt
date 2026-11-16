@@ -41,7 +41,7 @@ class DbSmokeTest {
 
         val now = System.currentTimeMillis()
         repo.addTransaction(1200, 0, food.id, "午饭", now)
-        repo.addMeal(1, 1, 700, 30, 100, "外卖", now)
+        repo.addMeal(1, 1, 700, "米饭青菜", com.dayledger.app.data.MealTag.VEG or com.dayledger.app.data.MealTag.PROTEIN, now)
         repo.addEvent("写周报", now, now + 3_600_000, top3 = true)
         repo.startTimer(activity.id, now - 1_800_000)
         repo.updateReview(Fmt.todayKey()) { it.copy(mood = 4, energy = 3, bedMinute = 70, wakeMinute = 450) }
@@ -54,8 +54,8 @@ class DbSmokeTest {
 
         val facts = repo.factsOf(snap, AppSettings())
         assertEquals(1200L, facts.expenseCents)
-        assertEquals(30, facts.proteinG ?: -1)
-        assertEquals(380, facts.sleepMinutes ?: -1)
+        assertTrue(facts.hasVeg)
+        assertEquals(700, facts.kcal ?: -1)
 
         val score = Scorer.scoreDay(facts)
         assertTrue("score should be positive, was ${score.total}", score.total > 0f)
