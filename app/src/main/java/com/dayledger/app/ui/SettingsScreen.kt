@@ -140,8 +140,8 @@ fun SettingsScreen(
                 Text("严格度", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(0.7f to "宽松", 1.0f to "标准", 1.3f to "严格").forEach { (v, label) ->
-                        ChoiceChip(label, kotlin.math.abs(settings.strictness - v) < 0.05f, Ink.warn) {
+                    listOf(0.85f to "宽松", 1.15f to "标准", 1.4f to "严格").forEach { (v, label) ->
+                        ChoiceChip(label, kotlin.math.abs(settings.strictness - v) < 0.1f, Ink.warn) {
                             vm.updateSettings { it.copy(strictness = v) }
                         }
                     }

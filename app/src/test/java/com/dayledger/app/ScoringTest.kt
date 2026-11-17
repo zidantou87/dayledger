@@ -140,7 +140,7 @@ class ScoringTest {
         val a = withoutSleep.dim("time")!!
         val b = withBadSleep.dim("time")!!
         assertTrue("no-sleep time score ${a.score} should beat ${b.score}", a.score > b.score)
-        assertTrue(a.evidence.any { it.contains("未记录") })
+        assertTrue(a.evidence.any { it.contains("未记") })
     }
 
     @Test

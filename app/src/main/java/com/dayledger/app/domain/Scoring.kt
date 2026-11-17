@@ -51,8 +51,8 @@ object Scorer {
     }
 
     fun grade(score: Float): String = when {
-        score >= 90f -> "S"
-        score >= 80f -> "A"
+        score >= 92f -> "S"
+        score >= 82f -> "A"
         score >= 70f -> "B"
         score >= 60f -> "C"
         else -> "D"
@@ -67,15 +67,19 @@ object Scorer {
             return DimScore("time", "时间", cfg.weightTime, 0f, false, listOf("今天没有记录时间"))
         }
         val coverageRatio = clamp01(f.recordedMinutes.toFloat() / f.awakeMinutes.coerceAtLeast(1))
-        val coveragePts = 20f * clamp01(coverageRatio / 0.7f)
-        val focusPts = 30f * clamp01(f.productiveMinutes.toFloat() / cfg.focusTargetMin.coerceAtLeast(1))
+        // 没记录的时间段不扣分：覆盖率只进"可信度"，不进分数
+        val focusPts = 50f * clamp01(f.productiveMinutes.toFloat() / cfg.focusTargetMin.coerceAtLeast(1))
+        val focusRatio = if (f.recordedMinutes <= 0) 0f
+        else clamp01(f.productiveMinutes.toFloat() / f.recordedMinutes)
+        val ratioPts = 15f * focusRatio
+        val deepPts = (f.deepFocusBlocks * 5f).coerceAtMost(15f)
 
         var sleepPts = 0f
         var sleepMax = 0f
         val sleepText: String
         if (f.sleepMinutes != null && f.bedMinute != null) {
-            sleepMax = 25f
-            // 7–8 小时算达标区间，超出区间每半小时扣 3，最多扣完 15
+            sleepMax = 20f
+            // 7–8 小时算达标区间，超出区间每半小时扣 3（最多扣完 12）
             val lower = cfg.sleepTargetMin - 30
             val upper = cfg.sleepTargetMin + 30
             val dev = when {
@@ -83,45 +87,28 @@ object Scorer {
                 f.sleepMinutes > upper -> (f.sleepMinutes - upper).toFloat()
                 else -> 0f
             }
-            val durPts = (15f - 3f * (dev / 30f)).coerceIn(0f, 15f)
+            val durPts = (12f - 3f * (dev / 30f)).coerceIn(0f, 12f)
             val late = lateMinutes(f.bedMinute, cfg.bedTargetMin)
-            val latePts = (10f - 2f * (late / 30f)).coerceIn(0f, 10f)
+            val latePts = (8f - 2f * (late / 30f)).coerceIn(0f, 8f)
             sleepPts = durPts + latePts
-            sleepText = "睡眠 ${Fmt.duration(f.sleepMinutes)} · ${Fmt.hm(f.bedMinute)} 入睡" +
+            sleepText = "昨晚睡眠 ${Fmt.duration(f.sleepMinutes)} · ${Fmt.hm(f.bedMinute)} 入睡（算今天）" +
                 if (late > 0) "（晚 $late 分钟）" else "（准时）"
         } else {
-            sleepText = "睡眠未记录（不计入本项）"
+            sleepText = "昨晚睡眠未记（不计入本项）"
         }
 
-        // 不用日历来安排事情的人，不该在"时间"这一维被扣一次；有安排才算结构分
-        var structMax = 25f
-        var structPts = 0f
-        val structText: String
-        if (f.events.isEmpty()) {
-            structMax = 0f
-            structText = "没有安排事项（结构分不计）"
-        } else {
-            val structRatio = f.plannedMinutes.toFloat() / f.awakeMinutes.coerceAtLeast(1)
-            structPts = when {
-                structRatio <= 0.4f -> 25f * (structRatio / 0.4f)
-                structRatio <= 0.8f -> 25f
-                else -> 25f - ((structRatio - 0.8f) / 0.1f) * 2.5f
-            }.coerceIn(0f, 25f)
-            structText = "计划 ${Fmt.duration(f.plannedMinutes)}（占清醒 ${Fmt.pct(structRatio)}）"
-        }
-
-        val maxPoints = 20f + 30f + sleepMax + structMax
-        val points = coveragePts + focusPts + structPts + sleepPts
+        val maxPoints = 50f + 15f + 15f + sleepMax
+        val points = focusPts + ratioPts + deepPts + sleepPts
         var score = points / maxPoints * 100f
         score = applyStrictness(score, cfg.strictness)
 
         return DimScore(
             key = "time", label = "时间", weight = cfg.weightTime, score = score, available = true,
             evidence = listOf(
-                "记录覆盖 ${Fmt.pct(coverageRatio)}（${Fmt.durationShort(f.recordedMinutes)} / ${Fmt.durationShort(f.awakeMinutes)}）",
-                "专注 ${Fmt.duration(f.productiveMinutes)} · 目标 ${Fmt.duration(cfg.focusTargetMin)}",
+                "专注 ${Fmt.duration(f.productiveMinutes)} · ${f.focusBlocks} 段（目标 ${Fmt.duration(cfg.focusTargetMin)}）",
+                "深度块 ${f.deepFocusBlocks} 个（单段 ≥45 分钟）· 专注占已记录 ${Fmt.pct(focusRatio)}",
                 sleepText,
-                structText,
+                "没记录的时间段不扣分" + if (f.recordedMinutes > 0) "（已记 ${Fmt.durationShort(f.recordedMinutes)}）" else "",
             ),
         )
     }

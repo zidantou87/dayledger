@@ -25,7 +25,7 @@ data class ScoreConfig(
     val dailyBudgetCents: Long = 12000,
     val calorieTarget: Int = 2200,
     val proteinTargetG: Int = 96,
-    val focusTargetMin: Int = 180,
+    val focusTargetMin: Int = 240,
     val sportTargetMin: Int = 30,
     val sleepTargetMin: Int = 450,
     val bedTargetMin: Int = 1410,
@@ -138,6 +138,9 @@ data class DayFacts(
 
     /** 专注只算工作/学习这类，运动单独进运动维度，避免一件事拿两份分 */
     val productiveMinutes: Int = blocks.filter { it.productive && !it.sport }.sumOf { it.minutes }
+    val focusBlocks: Int = blocks.count { it.productive && !it.sport }
+    /** 单段 ≥45 分钟的专注算一个"深度块" */
+    val deepFocusBlocks: Int = blocks.count { it.productive && !it.sport && it.minutes >= 45 }
     val plannedMinutes: Int = events.sumOf { it.minutes }
     val kcal: Int? = meals.mapNotNull { it.kcal }.takeIf { it.isNotEmpty() }?.sum()
     val proteinG: Int? = meals.mapNotNull { it.proteinG }.takeIf { it.isNotEmpty() }?.sum()
